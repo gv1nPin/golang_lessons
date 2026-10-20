@@ -1,18 +1,23 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func main() {
-	rowEven := " # # # #"
-	rowOdd := "# # # # "
-
 	const N = 8
 
 	for row := 0; row < N; row++ {
-		if row%2 == 0 {
-			fmt.Println(rowEven)
-		} else {
-			fmt.Println(rowOdd)
+		var line strings.Builder
+
+		for col := 0; col < N; col++ {
+			if (row+col)%2 == 0 {
+				line.WriteString(" ")
+			} else {
+				line.WriteString("#")
+			}
 		}
+		fmt.Println(line.String())
 	}
 }
