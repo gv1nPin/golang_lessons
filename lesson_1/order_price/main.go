@@ -2,20 +2,20 @@ package main
 
 import "fmt"
 
-type customerStatus int
+type CustomerStatus int
 
 const (
-	Regular customerStatus = iota
+	Regular CustomerStatus = iota
 	Silver
 	Gold
 )
 
 const (
-	deliveryCost    = 299
-	freeDeliveryMin = 3000
+	deliveryCost    = 299.0
+	freeDeliveryMin = 3000.0
 )
 
-func getStatusName(status customerStatus) string {
+func statusName(status CustomerStatus) string {
 	switch status {
 	case Regular:
 		return "Regular"
@@ -24,11 +24,11 @@ func getStatusName(status customerStatus) string {
 	case Gold:
 		return "Gold"
 	default:
-		return "Unknown"
+		return "неизвестный статус"
 	}
 }
 
-func getDiscountPercentage(status customerStatus) int {
+func discountPercent(status CustomerStatus) float64 {
 	switch status {
 	case Regular:
 		return 0
@@ -37,7 +37,6 @@ func getDiscountPercentage(status customerStatus) int {
 	case Gold:
 		return 10
 	default:
-		fmt.Println("Unknown")
 		return 0
 	}
 }
@@ -49,21 +48,21 @@ func calculateDelivery(amountAfterDiscount float64) float64 {
 	return deliveryCost
 }
 
-func processOrder(initialAmount float64, status customerStatus) {
-	discountPercentage := getDiscountPercentage(status)
-	discountAmount := initialAmount * (float64(discountPercentage) / 100)
-	amountAfterDiscount := initialAmount - discountAmount
-	currentDeliveryCost := calculateDelivery(amountAfterDiscount)
-	totalAmount := amountAfterDiscount + currentDeliveryCost
+func processOrder(amount float64, status CustomerStatus) {
+	discount := amount * discountPercent(status) / 100
+	amountAfterDiscount := amount - discount
+	delivery := calculateDelivery(amountAfterDiscount)
+	total := amountAfterDiscount + delivery
 
-	fmt.Printf("Сумма: %.2f, статус: %s\n", initialAmount, getStatusName(status))
-	fmt.Printf("Скидка: %.2f\n", discountAmount)
-	fmt.Printf("Доставка: %.2f\n", currentDeliveryCost)
-	fmt.Printf("Итого: %.2f\n\n", totalAmount)
+	fmt.Printf("Сумма: %.2f, статус: %s\n", amount, statusName(status))
+	fmt.Printf("Скидка: %.2f\n", discount)
+	fmt.Printf("Доставка: %.2f\n", delivery)
+	fmt.Printf("Итого: %.2f\n\n", total)
 }
 
 func main() {
 	processOrder(4500, Gold)
 	processOrder(2900, Silver)
 	processOrder(1000, Regular)
+	processOrder(1000, CustomerStatus(42)) // неизвестный статус
 }

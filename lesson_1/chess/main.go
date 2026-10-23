@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-func main() {
-	const N = 8
+const N = 8
 
+func main() {
 	for row := 0; row < N; row++ {
 		var line strings.Builder
 

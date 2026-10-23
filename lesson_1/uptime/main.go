@@ -1,45 +1,50 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-func main() {
-	totalSeconds := 93784
+const (
+	secondsInMinute = 60
+	secondsInHour   = 60 * secondsInMinute
+	secondsInDay    = 24 * secondsInHour
+)
 
-	const (
-		secondsIsMinute = 60
-		secondsIsHour   = 60 * 60
-		secondsIsDay    = 60 * 60 * 24
-	)
+func formatUptime(total int) string {
+	days := total / secondsInDay
+	remainder := total % secondsInDay
 
-	days := totalSeconds / secondsIsDay
-	remainder := totalSeconds % secondsIsDay
+	hours := remainder / secondsInHour
+	remainder %= secondsInHour
 
-	hours := remainder / secondsIsHour
-	remainder = remainder % secondsIsHour
+	minutes := remainder / secondsInMinute
+	seconds := remainder % secondsInMinute
 
-	minutes := remainder / secondsIsMinute
-	seconds := remainder % secondsIsMinute
-
-	hasOutput := false
-
+	var parts []string
 	if days > 0 {
-		fmt.Printf("%d days\n", days)
-		hasOutput = true
+		parts = append(parts, fmt.Sprintf("%dд", days))
 	}
 	if hours > 0 {
-		fmt.Printf("%d hours\n", hours)
-		hasOutput = true
+		parts = append(parts, fmt.Sprintf("%dч", hours))
 	}
 	if minutes > 0 {
-		fmt.Printf("%d minutes\n", minutes)
-		hasOutput = true
+		parts = append(parts, fmt.Sprintf("%dм", minutes))
 	}
 	if seconds > 0 {
-		fmt.Printf("%d seconds\n", seconds)
-		hasOutput = true
+		parts = append(parts, fmt.Sprintf("%dс", seconds))
 	}
-	if !hasOutput {
-		fmt.Printf("0c")
+
+	if len(parts) == 0 {
+		return "0с"
 	}
-	fmt.Printf("\n")
+	return strings.Join(parts, " ")
+}
+
+func main() {
+	examples := []int{93784, 86405, 3600, 59, 0}
+
+	for _, total := range examples {
+		fmt.Printf("%d -> %s\n", total, formatUptime(total))
+	}
 }
