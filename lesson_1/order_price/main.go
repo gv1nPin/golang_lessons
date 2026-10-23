@@ -8,6 +8,11 @@ const (
 	Gold
 )
 
+const (
+	DeliveryCost    = 299
+	FreeDeliveryMin = 3000
+)
+
 func getStatusName(status CustomerStatus) string {
 	switch status {
 	case Regular:
@@ -32,6 +37,13 @@ func getDiscountName(status CustomerStatus) int {
 	default:
 		return 0
 	}
+}
+
+func calculateDelivery(amountAfterDiscount int) int {
+	if amountAfterDiscount >= FreeDeliveryMin {
+		return 0
+	}
+	return DeliveryCost
 }
 
 func main() {
