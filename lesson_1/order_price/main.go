@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type CustomerStatus int
 
 const (
@@ -26,7 +28,7 @@ func getStatusName(status CustomerStatus) string {
 	}
 }
 
-func getDiscountName(status CustomerStatus) int {
+func getDiscountPercentage(status CustomerStatus) int {
 	switch status {
 	case Regular:
 		return 0
@@ -35,6 +37,7 @@ func getDiscountName(status CustomerStatus) int {
 	case Gold:
 		return 10
 	default:
+		fmt.Println("Unknown")
 		return 0
 	}
 }
