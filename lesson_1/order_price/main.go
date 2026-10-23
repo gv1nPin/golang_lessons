@@ -11,8 +11,8 @@ const (
 )
 
 const (
-	DeliveryCost    = 299
-	FreeDeliveryMin = 3000
+	deliveryCost    = 299
+	freeDeliveryMin = 3000
 )
 
 func getStatusName(status CustomerStatus) string {
@@ -42,18 +42,33 @@ func getDiscountPercentage(status CustomerStatus) int {
 	}
 }
 
-func calculateDelivery(amountAfterDiscount int) int {
-	if amountAfterDiscount >= FreeDeliveryMin {
+func calculateDelivery(amountAfterDiscount float64) float64 {
+	if amountAfterDiscount >= freeDeliveryMin {
 		return 0
 	}
-	return DeliveryCost
+	return deliveryCost
 }
 
 func main() {
 	var initialAmount float64
 	var status CustomerStatus
 	var discountPercentage int
-	var discontAmount float64
-	var finalAmount float64
+	var discountAmount float64
+	var amountAfterDiscount float64
+	var deliveryCost float64
+	var totalAmount float64
+
+	initialAmount = 4500
+	status = Gold
+	discountPercentage = getDiscountPercentage(status)
+	discountAmount = initialAmount * (float64(discountPercentage) / 100)
+	amountAfterDiscount = initialAmount - discountAmount
+	deliveryCost = calculateDelivery(amountAfterDiscount)
+	totalAmount = initialAmount - discountAmount
+
+	fmt.Printf("Сумма: %.2f, статус: %s\n", initialAmount, getStatusName(status))
+	fmt.Printf("Скидка: %.2f\n", discountAmount)
+	fmt.Printf("Доставка: %.2f\n", deliveryCost)
+	fmt.Printf("Итого: %.2f\n\n", totalAmount)
 
 }
