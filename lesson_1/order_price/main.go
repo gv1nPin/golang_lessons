@@ -50,5 +50,10 @@ func calculateDelivery(amountAfterDiscount int) int {
 }
 
 func main() {
+	var initialAmount float64
+	var status CustomerStatus
+	var discountPercentage int
+	var discontAmount float64
+	var finalAmount float64
 
 }
