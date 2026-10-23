@@ -17,16 +17,24 @@ func calculateCompoundInterest(amount float64, rate float64, months int) float64
 }
 
 func main() {
-	deposit := 100000.0
+	initialDeposit := 100000.0
+	balance := initialDeposit
 	annualRate := 12.0
 	months := 12
 
 	montlyRate := (annualRate / 100) / 12
+	monthCount := 0
 
-	fmt.Printf("Начальный депозит: %.2f под %.1f%% годовых с ежемесячной капитализацией:\n\n", deposit, annualRate)
+	fmt.Printf("Начальный депозит: %.2f под %.1f%% годовых с ежемесячной капитализацией:\n\n", balance, annualRate)
 
 	for month := 1; month <= months; month++ {
-		deposit += deposit * montlyRate
-		fmt.Printf("месяц %2d: %.2f\n", months, deposit)
+		balance += balance * montlyRate
+		fmt.Printf("месяц %2d: %.2f\n", months, balance)
+
+		for balance < (initialDeposit * 2) {
+			balance += balance * montlyRate
+			monthCount++
+		}
 	}
+	fmt.Printf("Вклад удвоится через %d мес. Баланс: %.2f\n", monthCount, balance)
 }
