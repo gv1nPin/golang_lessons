@@ -2,10 +2,10 @@ package main
 
 import "fmt"
 
-type CustomerStatus int
+type customerStatus int
 
 const (
-	Regular CustomerStatus = iota
+	Regular customerStatus = iota
 	Silver
 	Gold
 )
@@ -15,7 +15,7 @@ const (
 	freeDeliveryMin = 3000
 )
 
-func getStatusName(status CustomerStatus) string {
+func getStatusName(status customerStatus) string {
 	switch status {
 	case Regular:
 		return "Regular"
@@ -28,7 +28,7 @@ func getStatusName(status CustomerStatus) string {
 	}
 }
 
-func getDiscountPercentage(status CustomerStatus) int {
+func getDiscountPercentage(status customerStatus) int {
 	switch status {
 	case Regular:
 		return 0
@@ -49,7 +49,7 @@ func calculateDelivery(amountAfterDiscount float64) float64 {
 	return deliveryCost
 }
 
-func processOrder(initialAmount float64, status CustomerStatus) {
+func processOrder(initialAmount float64, status customerStatus) {
 	discountPercentage := getDiscountPercentage(status)
 	discountAmount := initialAmount * (float64(discountPercentage) / 100)
 	amountAfterDiscount := initialAmount - discountAmount
