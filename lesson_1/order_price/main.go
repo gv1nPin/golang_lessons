@@ -71,4 +71,30 @@ func main() {
 	fmt.Printf("Доставка: %.2f\n", deliveryCost)
 	fmt.Printf("Итого: %.2f\n\n", totalAmount)
 
+	initialAmount = 2900
+	status = Silver
+	discountPercentage = getDiscountPercentage(status)
+	discountAmount = initialAmount * (float64(discountPercentage) / 100)
+	amountAfterDiscount = initialAmount - discountAmount
+	deliveryCost = calculateDelivery(amountAfterDiscount)
+	totalAmount = initialAmount - discountAmount
+
+	fmt.Printf("Сумма: %.2f, статус: %s\n", initialAmount, getStatusName(status))
+	fmt.Printf("Скидка: %.2f\n", discountAmount)
+	fmt.Printf("Доставка: %.2f\n", deliveryCost)
+	fmt.Printf("Итого: %.2f\n\n", totalAmount)
+
+	initialAmount = 1000
+	status = Regular
+	discountPercentage = getDiscountPercentage(status)
+	discountAmount = initialAmount * (float64(discountPercentage) / 100)
+	amountAfterDiscount = initialAmount - discountAmount
+	deliveryCost = calculateDelivery(amountAfterDiscount)
+	totalAmount = initialAmount - discountAmount
+
+	fmt.Printf("Сумма: %.2f, статус: %s\n", initialAmount, getStatusName(status))
+	fmt.Printf("Скидка: %.2f\n", discountAmount)
+	fmt.Printf("Доставка: %.2f\n", deliveryCost)
+	fmt.Printf("Итого: %.2f\n\n", totalAmount)
+
 }
