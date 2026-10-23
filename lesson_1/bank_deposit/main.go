@@ -38,5 +38,7 @@ func main() {
 			monthCount++
 		}
 	}
-	fmt.Printf("Вклад удвоится через %d мес. Баланс: %.2f\n", monthCount, balance)
+	rubles := balance / 100
+	kopecks := balance % 100
+	fmt.Printf("Вклад удвоится через %d мес. Баланс: %d.%02d\n", monthCount, rubles, kopecks)
 }
