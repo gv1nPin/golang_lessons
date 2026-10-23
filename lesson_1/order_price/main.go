@@ -1,8 +1,6 @@
 package main
 
-import (
-	"fmt"
-)
+import "go/ast"
 
 type CustomerStatus int
 
@@ -14,4 +12,17 @@ const (
 
 func main() {
 
+	func (s CustomerStatus) String() string{
+		switch s {
+		case Regular:
+			return "Regular"
+		case Silver:
+			return "Silver"
+		case Gold:
+			return "Gold"
+		default:
+			return "Unknown"
+	}
+
+	}
 }
