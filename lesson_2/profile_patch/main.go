@@ -40,7 +40,7 @@ func ApplyPatch(p *Profile, patch ProfilePatch) {
 	}
 }
 
-// У bool всего два значения, true и false, и «поле не задано» среди
+// Ответ. У bool всего два значения, true и false, и «поле не задано» среди
 // них нет. Если в патче поле Newsletter bool, то значение по умолчанию false
 // невозможно отличить от осознанного «выключить подписку»: ApplyPatch не
 // понял бы, нужно ли записать false или поле вообще не трогать. То же с
@@ -57,18 +57,23 @@ func main() {
 	profile := Profile{Name: "Анна", Age: 30, Email: "anna@example.com", Newsletter: true}
 	fmt.Printf("%+v\n", profile)
 
+	// Литерал нельзя передать как указатель (&31 не компилируется),
+	// поэтому значения сначала кладём в переменные и берём их адреса.
 	age := 31
 	newsletter := false
 	ApplyPatch(&profile, ProfilePatch{Age: &age, Newsletter: &newsletter})
 	fmt.Printf("%+v\n", profile)
 
+	// Пустой патч профиль не меняет: все поля nil.
 	ApplyPatch(&profile, ProfilePatch{})
 	fmt.Printf("%+v\n", profile)
 
+	// Записать 0 тоже можно: указатель не nil, поэтому значение применится.
 	zero := 0
 	ApplyPatch(&profile, ProfilePatch{Age: &zero})
 	fmt.Printf("%+v\n", profile)
 
+	// nil-профиль не вызывает панику.
 	name := "Борис"
 	ApplyPatch(nil, ProfilePatch{Name: &name})
 	fmt.Println("ApplyPatch(nil, ...) отработал без паники")

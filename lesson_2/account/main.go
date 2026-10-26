@@ -23,6 +23,9 @@ func formatRub(kopecks int64) string {
 // NewAccount создаёт счёт и возвращает три замыкания над общим балансом.
 // Деньги хранятся в копейках (int64), чтобы не терять точность, как у float64.
 // Каждый вызов создаёт свою переменную current, поэтому счета независимы.
+//
+// deposit и withdraw ведут себя одинаково: при некорректной сумме (0 или
+// отрицательной) возвращают ErrInvalidAmount и баланс не меняют.
 func NewAccount(initial int64) (deposit func(int64) error, withdraw func(int64) error, balance func() int64) {
 	current := initial
 
