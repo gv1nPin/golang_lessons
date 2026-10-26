@@ -10,6 +10,7 @@ var (
 	ErrInvalidAmount     = errors.New("сумма должна быть положительной")
 )
 
+// formatRub переводит копейки в строку вида "1199.50".
 func formatRub(kopecks int64) string {
 	sign := ""
 	if kopecks < 0 {
@@ -19,14 +20,18 @@ func formatRub(kopecks int64) string {
 	return fmt.Sprintf("%s%d.%02d", sign, kopecks/100, kopecks%100)
 }
 
-func NewAccount(initial int64) (deposit func(int64), withdraw func(int64) error, balance func() int64) {
+// NewAccount создаёт счёт и возвращает три замыкания над общим балансом.
+// Деньги хранятся в копейках (int64), чтобы не терять точность, как у float64.
+// Каждый вызов создаёт свою переменную current, поэтому счета независимы.
+func NewAccount(initial int64) (deposit func(int64) error, withdraw func(int64) error, balance func() int64) {
 	current := initial
 
-	deposit = func(amount int64) {
+	deposit = func(amount int64) error {
 		if amount <= 0 {
-			return
+			return ErrInvalidAmount
 		}
 		current += amount
+		return nil
 	}
 
 	withdraw = func(amount int64) error {
@@ -53,8 +58,11 @@ func main() {
 
 	fmt.Printf("Счёт A: %s\n", formatRub(balanceA()))
 
-	depositA(50000) // 500.00 ₽
-	fmt.Printf("Пополнение %s -> %s\n", formatRub(50000), formatRub(balanceA()))
+	if err := depositA(50000); err != nil { // 500.00 ₽
+		fmt.Printf("Пополнение %s: %v\n", formatRub(50000), err)
+	} else {
+		fmt.Printf("Пополнение %s -> %s\n", formatRub(50000), formatRub(balanceA()))
+	}
 
 	if err := withdrawA(200000); err != nil { // 2000.00 ₽
 		fmt.Printf("Снятие %s: %v\n", formatRub(200000), err)
@@ -67,4 +75,12 @@ func main() {
 	}
 
 	fmt.Printf("Счёт B: %s\n", formatRub(balanceB()))
+
+	// Некорректные суммы: обе операции возвращают одну и ту же ошибку.
+	if err := depositA(0); err != nil {
+		fmt.Printf("Пополнение %s: %v\n", formatRub(0), err)
+	}
+	if err := withdrawA(-100); err != nil {
+		fmt.Printf("Снятие %s: %v\n", formatRub(-100), err)
+	}
 }
