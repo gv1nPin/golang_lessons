@@ -27,6 +27,8 @@ var operations = map[string]Operation{
 	},
 }
 
+// Calculate ищет операцию в map и вызывает её.
+// Для неизвестной операции возвращает ошибку и ничего не вызывает.
 func Calculate(a float64, op string, b float64) (float64, error) {
 	operation, ok := operations[op]
 	if !ok {
