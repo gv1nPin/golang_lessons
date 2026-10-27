@@ -5,6 +5,9 @@ import (
 	"unicode"
 )
 
+// letterCounts считает, сколько раз встречается каждый символ строки.
+// Регистр и пробелы игнорируются. Работаем с рунами, а не с байтами,
+// чтобы кириллица считалась правильно.
 func letterCounts(s string) map[rune]int {
 	counts := make(map[rune]int)
 	for _, r := range s {
@@ -16,6 +19,8 @@ func letterCounts(s string) map[rune]int {
 	return counts
 }
 
+// AreAnagrams проверяет, состоят ли строки из одних и тех же букв
+// в том же количестве. Регистр и пробелы игнорируются.
 func AreAnagrams(s1, s2 string) bool {
 	a, b := letterCounts(s1), letterCounts(s2)
 	if len(a) != len(b) {
