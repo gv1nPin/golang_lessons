@@ -83,7 +83,6 @@ func DescribeItem(i Item) string {
 		return noItem
 	}
 
-	// Интерфейс не пустой, но внутри может лежать nil-указатель
 	// (var weapon *Weapon). Тогда i != nil, а вызов i.Name() упадёт с паникой.
 	switch v := i.(type) {
 	case *Weapon:
@@ -173,10 +172,7 @@ func (inv *Inventory) FindItemByName(name string) (Item, bool) {
 	})
 }
 
-// --- Бонус: сохранение и загрузка ---
-//
-// Я добавил возврат error в методы: запись и разбор могут завершиться
-// ошибкой, и молча её терять нельзя.
+// Сохранение и загрузка
 
 type Storable interface {
 	Serialize(w io.Writer) error
@@ -388,7 +384,7 @@ func main() {
 		}
 	}
 
-	// Бонус: сохранение и загрузка
+	//Cохранение и загрузка
 	fmt.Println("--- Save / Load ---")
 	const path = "inventory.txt"
 
