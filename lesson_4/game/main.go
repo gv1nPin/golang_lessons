@@ -192,7 +192,7 @@ type StorableItem interface {
 var _ Storable = (*Weapon)(nil)
 var _ Storable = (*Armor)(nil)
 
-// Формат: "Weapon|Name|Damage|Durability|Weight"
+// Формат: "Name|Damage|Weapon|Durability|Weight"
 func (w *Weapon) Serialize(out io.Writer) error {
 	_, err := fmt.Fprintf(out, "Weapon|%s|%d|%d|%v\n", w.name, w.Damage, w.Durability, w.weight)
 	return err
