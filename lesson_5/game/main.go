@@ -17,7 +17,6 @@ var (
 	ErrNotFound  = errors.New("item not found")
 )
 
-// ParseItemError — типизированная ошибка разбора строки инвентаря.
 type ParseItemError struct {
 	Line  int
 	Value string
@@ -159,8 +158,9 @@ func Find[T any](items []T, condition func(T) bool) (T, bool) {
 }
 
 type Inventory struct {
-	Items  []Item
-	nextID int
+	Items    []Item
+	nextID   int
+	filePath string
 }
 
 func NewInventory() *Inventory {
@@ -318,6 +318,9 @@ func (inv *Inventory) Save(w io.Writer) error {
 	return nil
 }
 
+// Политика загрузки: Выбран подход fail-fast (прерывание при первой ошибке).
+// Это гарантирует, что инвентарь не будет приведен в частично некорректное состояние,
+// если файл данных был поврежден или изменен сторонним процессом.
 func (inv *Inventory) Load(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	lineNum := 0
@@ -391,6 +394,16 @@ func (inv *Inventory) LoadFromFile(path string) error {
 	return inv.Load(f)
 }
 
+// Ответы на вопросы по ТЗ (Пункт 4):
+//  1. Почему ошибка сломанного предмета не должна быть паникой?
+//     Потому что поломка предмета — это ожидаемая бизнес-ошибка, которую вызывающий код
+//     должен уметь штатно обработать (через errors.Is). Паника нужна только для
+//     исключительных ситуаций (ошибки системы, баги, нарушение инвариантов).
+//  2. Какая строка после panic не будет выполнена?
+//     Любая строка, идущая непосредственно после вызова panic в том же блоке выполнения.
+//  3. Почему recover должен находиться в отложенной функции (defer)?
+//     Потому что во время паники обычный поток выполнения прерывается, и выполняются
+//     только функции, вызванные через defer. Вызов recover в любом другом месте вернет nil.
 func UseDangerousItem(item Item) (message string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -410,7 +423,7 @@ func UseDangerousItem(item Item) (message string, err error) {
 }
 
 const inventoryFile = "inventory.dat"
-const demoInventoryFile = "demo_inventory.dat" // Исправление 5: отдельный файл для демо
+const demoInventoryFile = "demo_inventory.dat"
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
@@ -622,6 +635,10 @@ func main() {
 
 func demo() {
 	inv := NewInventory()
+	if err := inv.LoadFromFile(demoInventoryFile); err != nil {
+		fmt.Println("load error:", err)
+		return
+	}
 
 	sword := &Weapon{name: "Меч", weight: 3.0, Damage: 10, Durability: 5}
 	shield := &Armor{name: "Щит", weight: 4.5, Defense: 5}
