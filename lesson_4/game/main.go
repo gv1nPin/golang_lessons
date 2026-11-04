@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -75,30 +76,28 @@ func (p *Potion) Use() string {
 	return fmt.Sprintf("Используется %s: %s (осталось зарядов: %d)", p.name, p.Effect, p.Charges)
 }
 
-func DescribeItem(i Item) string {
-	const noItem = "Предмет отсутствует"
-
-	// Пустой интерфейс: в i вообще ничего нет.
-	if i == nil {
-		return noItem
-	}
-
-	// (var weapon *Weapon). Тогда i != nil, а вызов i.Name() упадёт с паникой.
+// isNilItem сообщает, что предмета фактически нет. Таких случаев два:
+//  1. в интерфейсе вообще ничего нет (i == nil);
+//  2. интерфейс не пустой, но внутри лежит nil-указатель (var weapon *Weapon).
+//     Тогда i != nil, а вызов i.Name() упал бы с паникой.
+func isNilItem(i Item) bool {
 	switch v := i.(type) {
+	case nil:
+		return true
 	case *Weapon:
-		if v == nil {
-			return noItem
-		}
+		return v == nil
 	case *Armor:
-		if v == nil {
-			return noItem
-		}
+		return v == nil
 	case *Potion:
-		if v == nil {
-			return noItem
-		}
+		return v == nil
 	}
+	return false
+}
 
+func DescribeItem(i Item) string {
+	if isNilItem(i) {
+		return "Предмет отсутствует"
+	}
 	return fmt.Sprintf("%s (вес: %.1f)", i.Name(), i.Weight())
 }
 
@@ -134,8 +133,14 @@ type Inventory struct {
 	Items []Item
 }
 
-func (inv *Inventory) AddItem(item Item) {
+// AddItem не принимает пустые предметы: ни nil, ни nil-указатель.
+// Иначе методы вроде ItemNames или Save упали бы с паникой.
+func (inv *Inventory) AddItem(item Item) error {
+	if isNilItem(item) {
+		return errors.New("нельзя добавить пустой предмет")
+	}
 	inv.Items = append(inv.Items, item)
+	return nil
 }
 
 func (inv *Inventory) Weapons() []*Weapon {
@@ -152,9 +157,9 @@ func (inv *Inventory) BrokenItems() []Item {
 	return Filter(inv.Items, func(item Item) bool {
 		switch v := item.(type) {
 		case *Weapon:
-			return v != nil && v.Durability <= 0
+			return v.Durability <= 0
 		case *Potion:
-			return v != nil && v.Charges <= 0
+			return v.Charges <= 0
 		}
 		return false
 	})
@@ -172,7 +177,10 @@ func (inv *Inventory) FindItemByName(name string) (Item, bool) {
 	})
 }
 
-// Сохранение и загрузка
+// --- Бонус: сохранение и загрузка ---
+//
+// Методы возвращают error: запись и разбор могут завершиться ошибкой,
+// и молча её терять нельзя.
 
 type Storable interface {
 	Serialize(w io.Writer) error
@@ -187,9 +195,22 @@ type StorableItem interface {
 
 var _ Storable = (*Weapon)(nil)
 var _ Storable = (*Armor)(nil)
+var _ Storable = (*Potion)(nil) // Potion добавлен сверх ТЗ, чтобы зелья не терялись при сохранении
 
-// Формат: "Name|Damage|Weapon|Durability|Weight"
+// checkField отклоняет значения, которые сломали бы формат записи:
+// разделитель "|" и перевод строки (одна запись = одна строка файла).
+func checkField(label, value string) error {
+	if strings.ContainsAny(value, "|\r\n") {
+		return fmt.Errorf("%s %q содержит символ «|» или перевод строки", label, value)
+	}
+	return nil
+}
+
+// Формат: "Weapon|Name|Damage|Durability|Weight"
 func (w *Weapon) Serialize(out io.Writer) error {
+	if err := checkField("название оружия", w.name); err != nil {
+		return err
+	}
 	_, err := fmt.Fprintf(out, "Weapon|%s|%d|%d|%v\n", w.name, w.Damage, w.Durability, w.weight)
 	return err
 }
@@ -221,6 +242,9 @@ func (w *Weapon) Deserialize(r io.Reader) error {
 
 // Формат: "Armor|Name|Defense|Weight"
 func (a *Armor) Serialize(out io.Writer) error {
+	if err := checkField("название брони", a.name); err != nil {
+		return err
+	}
 	_, err := fmt.Fprintf(out, "Armor|%s|%d|%v\n", a.name, a.Defense, a.weight)
 	return err
 }
@@ -245,6 +269,39 @@ func (a *Armor) Deserialize(r io.Reader) error {
 	return nil
 }
 
+// Формат: "Potion|Name|Effect|Charges|Weight"
+func (p *Potion) Serialize(out io.Writer) error {
+	if err := checkField("название зелья", p.name); err != nil {
+		return err
+	}
+	if err := checkField("эффект зелья", p.Effect); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(out, "Potion|%s|%s|%d|%v\n", p.name, p.Effect, p.Charges, p.weight)
+	return err
+}
+
+func (p *Potion) Deserialize(r io.Reader) error {
+	parts, err := readRecord(r, "Potion", 5)
+	if err != nil {
+		return err
+	}
+	charges, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return fmt.Errorf("неверное число зарядов %q: %w", parts[3], err)
+	}
+	weight, err := strconv.ParseFloat(parts[4], 64)
+	if err != nil {
+		return fmt.Errorf("неверный вес %q: %w", parts[4], err)
+	}
+
+	p.name = parts[1]
+	p.Effect = parts[2]
+	p.Charges = charges
+	p.weight = weight
+	return nil
+}
+
 // readRecord читает одну запись, делит её по "|" и проверяет тип и число полей.
 func readRecord(r io.Reader, kind string, fields int) ([]string, error) {
 	data, err := io.ReadAll(r)
@@ -260,7 +317,7 @@ func readRecord(r io.Reader, kind string, fields int) ([]string, error) {
 }
 
 // Save записывает по одной строке на предмет.
-// Предметы, которые не реализуют Storable (например, Potion), пропускаются.
+// Предметы, которые не реализуют Storable, пропускаются.
 func (inv *Inventory) Save(w io.Writer) error {
 	for _, item := range inv.Items {
 		storable, ok := item.(Storable)
@@ -294,6 +351,8 @@ func (inv *Inventory) Load(r io.Reader) error {
 			item = &Weapon{}
 		case "Armor":
 			item = &Armor{}
+		case "Potion":
+			item = &Potion{}
 		default:
 			return fmt.Errorf("неизвестный тип предмета: %q", kind)
 		}
@@ -339,10 +398,18 @@ func main() {
 	bow := &Weapon{name: "Сломанный лук", weight: 1.2, Damage: 5, Durability: 0}
 
 	inv := &Inventory{}
-	inv.AddItem(sword)
-	inv.AddItem(shield)
-	inv.AddItem(potion)
-	inv.AddItem(bow)
+	for _, item := range []Item{sword, shield, potion, bow} {
+		if err := inv.AddItem(item); err != nil {
+			fmt.Println("Ошибка добавления:", err)
+			return
+		}
+	}
+
+	// AddItem: пустые предметы отклоняются
+	fmt.Println("--- AddItem ---")
+	var weapon *Weapon // nil-указатель
+	fmt.Println("nil:", inv.AddItem(nil))
+	fmt.Println("nil-указатель:", inv.AddItem(weapon))
 
 	// 1. Use
 	fmt.Println("--- Use ---")
@@ -353,7 +420,6 @@ func main() {
 
 	// 2. DescribeItem
 	fmt.Println("--- DescribeItem ---")
-	var weapon *Weapon
 	fmt.Println(DescribeItem(sword))
 	fmt.Println(DescribeItem(nil))
 	fmt.Println(DescribeItem(weapon))
@@ -384,10 +450,15 @@ func main() {
 		}
 	}
 
-	//Cохранение и загрузка
+	// Бонус: сохранение и загрузка
 	fmt.Println("--- Save / Load ---")
-	const path = "inventory.txt"
 
+	// Имя с разделителем не должно попасть в файл
+	var sb strings.Builder
+	badSword := &Weapon{name: "Меч|2", weight: 1, Damage: 1, Durability: 1}
+	fmt.Println("Имя с «|»:", badSword.Serialize(&sb))
+
+	const path = "inventory.txt"
 	if err := saveToFile(inv, path); err != nil {
 		fmt.Println("Ошибка сохранения:", err)
 		return
