@@ -68,10 +68,11 @@ func (w *Weapon) Use() (string, error) {
 }
 
 type Armor struct {
-	id      int
-	name    string
-	weight  float64
-	Defense int
+	id       int
+	name     string
+	weight   float64
+	Defense  int
+	Equipped bool
 }
 
 func (a *Armor) Name() string    { return a.name }
@@ -80,6 +81,11 @@ func (a *Armor) ID() int         { return a.id }
 func (a *Armor) SetID(id int)    { a.id = id }
 
 func (a *Armor) Use() (string, error) {
+	// Исправление 1: Изменение состояния Armor согласно ТЗ
+	if a.Equipped {
+		return fmt.Sprintf("%s уже надето", a.name), nil
+	}
+	a.Equipped = true
 	return fmt.Sprintf("Надевается %s (защита %d)", a.name, a.Defense), nil
 }
 
@@ -108,7 +114,6 @@ func DescribeItem(i Item) string {
 	if i == nil {
 		return "Предмет отсутствует"
 	}
-	// Проверка типизированного nil: interface содержит nil-указатель.
 	switch v := i.(type) {
 	case *Weapon:
 		if v == nil {
@@ -163,7 +168,6 @@ func NewInventory() *Inventory {
 	return &Inventory{nextID: 1}
 }
 
-// AddItem добавляет предмет, присваивает ID и возвращает его.
 func (inv *Inventory) AddItem(item Item) int {
 	id := inv.nextID
 	inv.nextID++
@@ -228,7 +232,11 @@ func serializeItem(item Item) string {
 	case *Weapon:
 		return fmt.Sprintf("Weapon|%d|%s|%d|%d|%g", v.id, v.name, v.Damage, v.Durability, v.weight)
 	case *Armor:
-		return fmt.Sprintf("Armor|%d|%s|%d|%g", v.id, v.name, v.Defense, v.weight)
+		eq := 0
+		if v.Equipped {
+			eq = 1
+		}
+		return fmt.Sprintf("Armor|%d|%s|%d|%g|%d", v.id, v.name, v.Defense, v.weight, eq)
 	case *Potion:
 		return fmt.Sprintf("Potion|%d|%s|%s|%d|%g", v.id, v.name, v.Effect, v.Charges, v.weight)
 	default:
@@ -262,15 +270,21 @@ func parseItem(line string, lineNum int) (Item, error) {
 		return &Weapon{id: id, name: parts[2], Damage: dmg, Durability: dur, weight: w}, nil
 
 	case "Armor":
-		if len(parts) != 5 {
-			return nil, &ParseItemError{Line: lineNum, Value: line, Err: errors.New("expected 5 fields for Armor")}
+		if len(parts) < 5 || len(parts) > 6 {
+			return nil, &ParseItemError{Line: lineNum, Value: line, Err: errors.New("expected 5 or 6 fields for Armor")}
 		}
 		def, err1 := strconv.Atoi(parts[3])
 		w, err2 := strconv.ParseFloat(parts[4], 64)
 		if err1 != nil || err2 != nil {
 			return nil, &ParseItemError{Line: lineNum, Value: line, Err: errors.New("invalid numeric fields")}
 		}
-		return &Armor{id: id, name: parts[2], Defense: def, weight: w}, nil
+		eq := false
+		if len(parts) == 6 {
+			if parts[5] == "1" {
+				eq = true
+			}
+		}
+		return &Armor{id: id, name: parts[2], Defense: def, weight: w, Equipped: eq}, nil
 
 	case "Potion":
 		if len(parts) != 6 {
@@ -309,6 +323,10 @@ func (inv *Inventory) Load(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	lineNum := 0
 	var maxID int
+
+	var tempItems []Item
+	idMap := make(map[int]bool)
+
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
@@ -317,9 +335,15 @@ func (inv *Inventory) Load(r io.Reader) error {
 		}
 		item, err := parseItem(line, lineNum)
 		if err != nil {
-			return err // fail-fast
+			return err
 		}
-		inv.Items = append(inv.Items, item)
+
+		if idMap[item.ID()] {
+			return &ParseItemError{Line: lineNum, Value: line, Err: fmt.Errorf("duplicate item id: %d", item.ID())}
+		}
+		idMap[item.ID()] = true
+
+		tempItems = append(tempItems, item)
 		if item.ID() > maxID {
 			maxID = item.ID()
 		}
@@ -327,11 +351,12 @@ func (inv *Inventory) Load(r io.Reader) error {
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("scanner: %w", err)
 	}
+
+	inv.Items = tempItems
 	inv.nextID = maxID + 1
 	return nil
 }
 
-// SaveToFile — атомарное сохранение через временный файл (бонус).
 func (inv *Inventory) SaveToFile(path string) error {
 	tmp := path + ".tmp"
 	f, err := os.Create(tmp)
@@ -359,7 +384,7 @@ func (inv *Inventory) LoadFromFile(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // файла ещё нет — пустой инвентарь
+			return nil
 		}
 		return fmt.Errorf("open: %w", err)
 	}
@@ -367,19 +392,6 @@ func (inv *Inventory) LoadFromFile(path string) error {
 	return inv.Load(f)
 }
 
-// UseDangerousItem демонстрирует преобразование panic в error.
-//
-//  1. Почему ошибка сломанного предмета не должна быть паникой?
-//     Потому что это ожидаемая бизнес-ошибка, которую вызывающий код
-//     должен уметь обработать (errors.Is). Паника предназначена для
-//     действительно исключительных ситуаций (баги, нарушение инвариантов).
-//
-//  2. Какая строка после panic не будет выполнена?
-//     Любая строка после вызова panic в той же функции (до recover).
-//
-//  3. Почему recover должен находиться в отложенной функции?
-//     recover работает только внутри deferred-функции. Если вызвать
-//     recover напрямую, он всегда вернёт nil.
 func UseDangerousItem(item Item) (message string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -391,15 +403,15 @@ func UseDangerousItem(item Item) (message string, err error) {
 		return "", errors.New("nil item")
 	}
 
-	// Специальный «опасный» предмет вызывает панику.
 	if item.Name() == "Бомба" {
-		panic("взрыв опасного предмета!")
+		panic("взрыв!")
 	}
 
 	return item.Use()
 }
 
 const inventoryFile = "inventory.dat"
+const demoInventoryFile = "demo_inventory.dat" // Исправление 5: отдельный файл для демо
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
@@ -413,7 +425,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	inv := NewInventory()
 	if err := inv.LoadFromFile(inventoryFile); err != nil {
 		fmt.Fprintf(stderr, "load inventory: %v\n", err)
-		// Если ошибка разбора — попробуем показать детали.
 		var pe *ParseItemError
 		if errors.As(err, &pe) {
 			fmt.Fprintf(stderr, "  line %d: %q\n", pe.Line, pe.Value)
@@ -423,7 +434,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	switch cmd {
 	case "list":
-		return cmdList(inv, stdout, stderr)
+		return cmdList(inv, rest, stdout, stderr)
 	case "add":
 		return cmdAdd(inv, rest, stdout, stderr)
 	case "use":
@@ -436,7 +447,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 }
 
-func cmdList(inv *Inventory, stdout, stderr io.Writer) int {
+func cmdList(inv *Inventory, args []string, stdout, stderr io.Writer) int {
+	fs := flagNew("list")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "list command takes no positional arguments, got %v\n", fs.Args())
+		return 2
+	}
+
 	if len(inv.Items) == 0 {
 		fmt.Fprintln(stdout, "inventory is empty")
 		return 0
@@ -462,8 +483,24 @@ func cmdAdd(inv *Inventory, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+
+	// Исправление 4: проверка NArg для выявления лишних аргументов
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "unexpected positional arguments for add: %v\n", fs.Args())
+		return 2
+	}
+
 	if *name == "" {
 		fmt.Fprintln(stderr, "flag -name is required")
+		return 2
+	}
+
+	if strings.Contains(*name, "|") || strings.Contains(*name, "\n") {
+		fmt.Fprintln(stderr, "invalid item name: must not contain '|' or newlines")
+		return 2
+	}
+	if strings.Contains(*effect, "|") || strings.Contains(*effect, "\n") {
+		fmt.Fprintln(stderr, "invalid potion effect: must not contain '|' or newlines")
 		return 2
 	}
 
@@ -496,6 +533,12 @@ func cmdUse(inv *Inventory, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "unexpected positional arguments for use: %v\n", fs.Args())
+		return 2
+	}
+
 	if *id == 0 {
 		fmt.Fprintln(stderr, "flag -id is required")
 		return 2
@@ -534,6 +577,12 @@ func cmdDelete(inv *Inventory, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "unexpected positional arguments for delete: %v\n", fs.Args())
+		return 2
+	}
+
 	if *id == 0 {
 		fmt.Fprintln(stderr, "flag -id is required")
 		return 2
@@ -553,7 +602,7 @@ func cmdDelete(inv *Inventory, args []string, stdout, stderr io.Writer) int {
 
 func flagNew(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
-	fs.SetOutput(io.Discard) // errors handled by us
+	fs.SetOutput(io.Discard)
 	return fs
 }
 
@@ -636,14 +685,14 @@ func demo() {
 	}
 
 	fmt.Println("\n=== Save / Load ===")
-	if err := inv.SaveToFile(inventoryFile); err != nil {
+	if err := inv.SaveToFile(demoInventoryFile); err != nil {
 		fmt.Println("save error:", err)
 	} else {
-		fmt.Println("saved to", inventoryFile)
+		fmt.Println("saved to", demoInventoryFile)
 	}
 
 	inv2 := NewInventory()
-	if err := inv2.LoadFromFile(inventoryFile); err != nil {
+	if err := inv2.LoadFromFile(demoInventoryFile); err != nil {
 		fmt.Println("load error:", err)
 		var pe *ParseItemError
 		if errors.As(err, &pe) {
