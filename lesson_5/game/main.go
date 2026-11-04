@@ -17,7 +17,6 @@ var (
 	ErrNotFound  = errors.New("item not found")
 )
 
-// ParseItemError — типизированная ошибка разбора строки инвентаря.
 type ParseItemError struct {
 	Line  int
 	Value string
@@ -159,8 +158,9 @@ func Find[T any](items []T, condition func(T) bool) (T, bool) {
 }
 
 type Inventory struct {
-	Items  []Item
-	nextID int
+	Items    []Item
+	nextID   int
+	filePath string
 }
 
 func NewInventory() *Inventory {
@@ -383,7 +383,6 @@ func (inv *Inventory) SaveToFile(path string) error {
 }
 
 func (inv *Inventory) LoadFromFile(path string) error {
-	inv.filePath = path
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -396,15 +395,15 @@ func (inv *Inventory) LoadFromFile(path string) error {
 }
 
 // Ответы на вопросы по ТЗ (Пункт 4):
-// 1. Почему ошибка сломанного предмета не должна быть паникой?
-//    Потому что поломка предмета — это ожидаемая бизнес-ошибка, которую вызывающий код 
-//    должен уметь штатно обработать (через errors.Is). Паника нужна только для 
-//    исключительных ситуаций (ошибки системы, баги, нарушение инвариантов).
-// 2. Какая строка после panic не будет выполнена?
-//    Любая строка, идущая непосредственно после вызова panic в том же блоке выполнения.
-// 3. Почему recover должен находиться в отложенной функции (defer)?
-//    Потому что во время паники обычный поток выполнения прерывается, и выполняются 
-//    только функции, вызванные через defer. Вызов recover в любом другом месте вернет nil.
+//  1. Почему ошибка сломанного предмета не должна быть паникой?
+//     Потому что поломка предмета — это ожидаемая бизнес-ошибка, которую вызывающий код
+//     должен уметь штатно обработать (через errors.Is). Паника нужна только для
+//     исключительных ситуаций (ошибки системы, баги, нарушение инвариантов).
+//  2. Какая строка после panic не будет выполнена?
+//     Любая строка, идущая непосредственно после вызова panic в том же блоке выполнения.
+//  3. Почему recover должен находиться в отложенной функции (defer)?
+//     Потому что во время паники обычный поток выполнения прерывается, и выполняются
+//     только функции, вызванные через defer. Вызов recover в любом другом месте вернет nil.
 func UseDangerousItem(item Item) (message string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
