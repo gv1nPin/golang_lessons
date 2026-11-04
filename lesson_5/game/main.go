@@ -81,7 +81,6 @@ func (a *Armor) ID() int         { return a.id }
 func (a *Armor) SetID(id int)    { a.id = id }
 
 func (a *Armor) Use() (string, error) {
-	// Исправление 1: Изменение состояния Armor согласно ТЗ
 	if a.Equipped {
 		return fmt.Sprintf("%s уже надето", a.name), nil
 	}
