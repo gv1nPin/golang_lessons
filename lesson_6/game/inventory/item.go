@@ -53,6 +53,9 @@ type Armor struct {
 }
 
 // Potion — зелье.
+// Effect экспортируемый (удобно читать и в тестах), но при сохранении
+// storage проверяет, что в нём нет '|' и переводов строк — иначе encode вернёт ошибку.
+// Менять Effect после NewPotion можно, но запись с «битым» значением не сохранится.
 type Potion struct {
 	name    string
 	weight  float64

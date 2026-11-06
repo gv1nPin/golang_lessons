@@ -68,18 +68,42 @@ func encode(w io.Writer, inv *inventory.Inventory) error {
 	return nil
 }
 
+// reservedInField — символы, из-за которых строку нельзя однозначно разобрать.
+// Effect (и Name) экспортируемые: их можно изменить после New*, поэтому при сохранении
+// проверяем ещё раз — иначе «битое» значение уйдёт в файл и сломает загрузку.
+const reservedInField = "|\r\n"
+
+func checkField(label, value string) error {
+	if strings.ContainsAny(value, reservedInField) {
+		return fmt.Errorf("%w: %s %q must not contain '|' or newlines", inventory.ErrInvalidItem, label, value)
+	}
+	return nil
+}
+
 // formatItem превращает предмет в строку данных.
 func formatItem(id int, item inventory.Item) (string, error) {
 	switch v := item.(type) {
 	case *inventory.Weapon:
+		if err := checkField("name", v.Name()); err != nil {
+			return "", err
+		}
 		return fmt.Sprintf("%s|%d|%s|%d|%d|%g", kindWeapon, id, v.Name(), v.Damage, v.Durability, v.Weight()), nil
 	case *inventory.Armor:
+		if err := checkField("name", v.Name()); err != nil {
+			return "", err
+		}
 		equipped := 0
 		if v.Equipped {
 			equipped = 1
 		}
 		return fmt.Sprintf("%s|%d|%s|%d|%g|%d", kindArmor, id, v.Name(), v.Defense, v.Weight(), equipped), nil
 	case *inventory.Potion:
+		if err := checkField("name", v.Name()); err != nil {
+			return "", err
+		}
+		if err := checkField("effect", v.Effect); err != nil {
+			return "", err
+		}
 		return fmt.Sprintf("%s|%d|%s|%s|%d|%g", kindPotion, id, v.Name(), v.Effect, v.Charges, v.Weight()), nil
 	}
 	return "", fmt.Errorf("%w: %T", ErrNotStorable, item)
@@ -98,23 +122,31 @@ func formatItem(id int, item inventory.Item) (string, error) {
 func decode(r io.Reader) (*inventory.Inventory, error) {
 	inv := inventory.New()
 
-	scanner := bufio.NewScanner(r)
-	for lineNo := 1; scanner.Scan(); lineNo++ {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	// bufio.Reader + ReadString не ограничивает длину строки
+	br := bufio.NewReader(r)
+	for lineNo := 1; ; lineNo++ {
+		line, err := br.ReadString('\n')
+		if len(line) > 0 {
+			// ReadString оставляет '\n' в конце (кроме последней строки без него).
+			line = strings.TrimSuffix(line, "\n")
+			line = strings.TrimSuffix(line, "\r")
+			line = strings.TrimSpace(line)
+			if line != "" {
+				id, item, parseErr := parseLine(line)
+				if parseErr == nil {
+					parseErr = inv.AddItemWithID(id, item)
+				}
+				if parseErr != nil {
+					return nil, &ParseItemError{Line: lineNo, Value: line, Err: parseErr}
+				}
+			}
 		}
-
-		id, item, err := parseLine(line)
-		if err == nil {
-			err = inv.AddItemWithID(id, item)
+		if err == io.EOF {
+			break
 		}
 		if err != nil {
-			return nil, &ParseItemError{Line: lineNo, Value: line, Err: err}
+			return nil, fmt.Errorf("read: %w", err)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan: %w", err)
 	}
 
 	return inv, nil
