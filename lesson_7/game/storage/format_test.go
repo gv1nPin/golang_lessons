@@ -427,8 +427,8 @@ func TestDecodeReaderErrors(t *testing.T) {
 	})
 
 	t.Run("успешно сохранённая длинная запись читается обратно", func(t *testing.T) {
-		// Имя длиннее MaxScanTokenSize — с Scanner не прочиталось бы.
-		name := strings.Repeat("x", 1000)
+		// Имя длиннее MaxScanTokenSize
+		name := strings.Repeat("x", bufio.MaxScanTokenSize+1)
 		potion := mustPotion(t, name, 0.5, "+HP", 1)
 		inv := inventory.New()
 		if _, err := inv.AddItem(potion); err != nil {
