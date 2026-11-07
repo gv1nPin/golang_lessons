@@ -407,16 +407,43 @@ func TestDecodeReaderErrors(t *testing.T) {
 		}
 	})
 
-	t.Run("слишком длинная строка", func(t *testing.T) {
+	t.Run("длинная строка читается (нет лимита Scanner)", func(t *testing.T) {
+		// bufio.Reader не ограничивает длину строки 64 KiB.
+		// Строка из одних 'a' — невалидный формат → ParseItemError, не ErrTooLong.
 		long := strings.Repeat("a", bufio.MaxScanTokenSize+1)
 
 		inv, err := decode(strings.NewReader(long))
 
-		if !errors.Is(err, bufio.ErrTooLong) {
-			t.Errorf("err = %v, хочу bufio.ErrTooLong", err)
+		if errors.Is(err, bufio.ErrTooLong) {
+			t.Fatalf("не ожидаем bufio.ErrTooLong при чтении через Reader: %v", err)
+		}
+		var parseErr *ParseItemError
+		if !errors.As(err, &parseErr) {
+			t.Fatalf("err = %v, хочу *ParseItemError", err)
 		}
 		if inv != nil {
 			t.Error("при ошибке инвентарь не должен возвращаться")
+		}
+	})
+
+	t.Run("успешно сохранённая длинная запись читается обратно", func(t *testing.T) {
+		// Имя длиннее MaxScanTokenSize — с Scanner не прочиталось бы.
+		name := strings.Repeat("x", 1000)
+		potion := mustPotion(t, name, 0.5, "+HP", 1)
+		inv := inventory.New()
+		if _, err := inv.AddItem(potion); err != nil {
+			t.Fatal(err)
+		}
+		var buf bytes.Buffer
+		if err := encode(&buf, inv); err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := decode(&buf)
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got := loaded.ItemNames(); len(got) != 1 || got[0] != name {
+			t.Errorf("names = %v, хочу [%q]", got, name)
 		}
 	})
 }
@@ -443,5 +470,26 @@ func TestParseItemError(t *testing.T) {
 	var found *ParseItemError
 	if !errors.As(wrapped, &found) || found.Line != 7 {
 		t.Errorf("errors.As не нашёл ParseItemError в цепочке: %v", wrapped)
+	}
+}
+
+// Effect экспортируемый: его можно изменить после NewPotion.
+// encode должен отклонить «битое» значение, иначе файл нельзя будет прочитать.
+func TestEncodeRejectsMutatedEffect(t *testing.T) {
+	potion := mustPotion(t, "Зелье", 0.5, "+10 HP", 1)
+	potion.Effect = "a|b" // обход конструктора
+
+	inv := inventory.New()
+	if _, err := inv.AddItem(potion); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	err := encode(&buf, inv)
+	if !errors.Is(err, inventory.ErrInvalidItem) {
+		t.Errorf("err = %v, хочу ErrInvalidItem", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("при ошибке в буфер ничего не должно попасть, записано %d байт", buf.Len())
 	}
 }
