@@ -226,8 +226,8 @@ func TestDescribeItem(t *testing.T) {
 // перехватывает не только собственную панику.
 type panickyItem struct{}
 
-func (panickyItem) Name() string          { return "Ловушка" }
-func (panickyItem) Weight() float64       { return 1 }
+func (panickyItem) Name() string         { return "Ловушка" }
+func (panickyItem) Weight() float64      { return 1 }
 func (panickyItem) Use() (string, error) { panic("ловушка сработала") }
 
 func TestUseDangerousItem(t *testing.T) {
